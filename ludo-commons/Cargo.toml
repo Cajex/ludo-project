@@ -1,0 +1,10 @@
+[package]
+name = "ludo-commons"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0.217", features = ["serde_derive"] }
+serde_json = "1.0.135"
+anyhow = "1.0.95"
+derive-new = "0.7.0"

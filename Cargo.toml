@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "ludo-commons",
+    "ludo-client",
+    "ludo-server"
+]

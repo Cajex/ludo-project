@@ -1,0 +1,9 @@
+[package]
+name = "ludo-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.15.1"
+bevy_renet = { version = "1.0.0", features = ["netcode"] }
+ludo-commons = { path = "../ludo-commons" }

@@ -8,3 +8,5 @@ serde = { version = "1.0.217", features = ["serde_derive"] }
 serde_json = "1.0.135"
 anyhow = "1.0.95"
 derive-new = "0.7.0"
+bevy = "0.15.1"
+uuid = "1.11.1"

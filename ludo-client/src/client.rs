@@ -3,6 +3,7 @@ use std::net::UdpSocket;
 use std::time::SystemTime;
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel, RenetClient};
+use ludo_commons::game::LudoGameProfile;
 use crate::{handler, handshake};
 
 #[derive(Default)]
@@ -11,11 +12,17 @@ pub struct LudoClientPlugin {
 
 impl Plugin for LudoClientPlugin {
     fn build(&self, application: &mut App) {
-        application.add_systems(Startup, Self::connect_client_system).add_systems(PostStartup, handshake::commit_handshake_system).add_systems(Update, (handler::handle_server_outcome_system));
+        application.add_systems(PreStartup, Self::enable_system).add_systems(Startup, Self::connect_client_system).add_systems(PostStartup, handshake::commit_handshake_system).add_systems(Update, handler::handle_server_outcome_system);
     }
 }
 
 impl LudoClientPlugin {
+    pub fn enable_system(mut commands: Commands) {
+        let result = LudoGameProfile::load_from_file("game-profile.json").expect("unable to load ludo game profile");
+        info!("load game profile...");
+        commands.spawn(result);
+    }
+
     pub fn connect_client_system(mut commands: Commands) {
         let client = RenetClient::new(ConnectionConfig::default());
         commands.insert_resource(client);

@@ -1,12 +1,13 @@
 use bevy::log::warn;
 use crate::server::LudoClientPool;
-use bevy::prelude::{info, Res, ResMut};
+use bevy::prelude::*;
 use bevy::utils::info;
 use bevy_renet::renet::{DefaultChannel, RenetServer};
-use ludo_commons::{packets, security, LudoPacket};
-use ludo_commons::packets::LudoGameIncomeHandshakePacket;
+use ludo_commons::{packets, security, LudoPacket, Pair};
+use ludo_commons::game::LudoGameProfileData;
+use ludo_commons::packets::{LudoGameIncomeHandshakePacket, LudoGameIncomeProfilePacket, LudoGameOutcomeProfilePacket};
 
-pub fn handle_client_income(mut server: ResMut<RenetServer>, mut ludo_client_pool: ResMut<LudoClientPool>) {
+pub fn handle_client_income(mut commands: Commands, mut server: ResMut<RenetServer>, mut ludo_client_pool: ResMut<LudoClientPool>, mut profile_data: Query<&mut LudoGameProfileData>) {
     let mut clients_to_remove = Vec::new();
     let client_ids: Vec<_> = server.clients_id_iter().collect();
     for client_id in client_ids {
@@ -18,36 +19,55 @@ pub fn handle_client_income(mut server: ResMut<RenetServer>, mut ludo_client_poo
                     info!("Connection closed: {}", client_id);
                 }
                 Some(client_data) => {
-                    for mut items in client_data.iter_mut() {
+                    let raw_data = String::from_utf8_lossy(&message).to_string();
+                    if let Ok(handshake_packet) = <LudoGameIncomeHandshakePacket as LudoPacket>::make_packet::<LudoGameIncomeHandshakePacket>(raw_data.clone()) {
+                    for items in client_data.iter_mut() {
                         if items.0.eq("client.handshake") {
                             if let Some(value) = items.1.downcast_ref::<bool>() {
                                 if !*value {
-                                    let raw_data = String::from_utf8_lossy(&message).to_string();
-                                    let handshake_packet = <LudoGameIncomeHandshakePacket as LudoPacket>::make_packet::<LudoGameIncomeHandshakePacket>(raw_data.clone());
-                                    if let Ok(handshake_packet) = handshake_packet {
-                                        if handshake_packet.key.eq(&security::SECRET_KEY) {
-                                            info!("client successfully handshake: {}", client_id);
-                                            items.1 = Box::new(true);
-                                        } else {
-                                            server.disconnect(client_id);
-                                            clients_to_remove.push(client_id);
-                                            warn!("wrong security key from: {}", client_id);
-                                        }
+                                    if handshake_packet.key.eq(&security::SECRET_KEY) {
+                                        info!("client successfully handshake: {}", client_id);
+                                        items.1 = Box::new(true);
                                     } else {
                                         server.disconnect(client_id);
                                         clients_to_remove.push(client_id);
-                                        warn!("wrong packet received from: {0} content: [{1}].", client_id, raw_data);
-                                        info!("right packet content would be: [{}].", LudoGameIncomeHandshakePacket::new(security::SECRET_KEY).into_string().unwrap());
+                                        warn!("wrong security key from: {}", client_id);
                                     }
                                 }
                             }
+                        }
+                    }
+                } else {
+                    if let Ok(profile_income_packet) = <LudoGameIncomeProfilePacket as LudoPacket>::make_packet::<LudoGameIncomeProfilePacket>(raw_data.clone()) {
+                        info!("client successfully sent profile data: {:?}", profile_income_packet.profile);
+                        ludo_client_pool.ludo_clients_pool.get_mut(&client_id).unwrap().push(Pair::new("server.profile".to_string(), Box::new(profile_income_packet.profile.clone())));
+                        let mut found = false;
+                        profile_data.iter_mut().for_each(|profile_data| {
+                            if profile_data.unique_id.eq(&profile_income_packet.profile.unique_id.clone()) {
+                                let packet = LudoGameOutcomeProfilePacket::new(profile_data.clone());
+                                server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string().unwrap());
+                                found = true;
+                                info!("Client successfully sent profile data: {:?}", profile_income_packet.profile);
+                            }
+                        });
+                        if !found {
+                            let profile_data = LudoGameProfileData {
+                                unique_id: profile_income_packet.profile.unique_id.clone(),
+                                points: 0,
+                            };
+                            commands.spawn(profile_data.clone());
+                            let packet = LudoGameOutcomeProfilePacket::new(profile_data);
+                            server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string().unwrap());
+                            info!("Client successfully sent profile data: {:?}", profile_income_packet.profile);
+                            info!("a new profile data were created!")
                         }
                     }
                 }
             }
         }
     }
-    if !clients_to_remove.is_empty() {
+}
+if ! clients_to_remove.is_empty() {
         for client_id in clients_to_remove {
             ludo_client_pool.ludo_clients_pool.remove(&client_id);
         }

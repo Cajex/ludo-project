@@ -1,5 +1,6 @@
 pub mod security;
 pub mod packets;
+pub mod game;
 
 use derive_new::new;
 pub use crate::security::SECRET_KEY;

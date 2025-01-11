@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 use derive_new::new;
+use crate::game::{LudoGameProfile, LudoGameProfileData};
+use crate::LudoPacketType::{Income, Outcome};
 
 pub enum LudoPacketType {
     /* packets sent from one or more clients to the server. */
@@ -26,12 +28,12 @@ pub trait LudoPacket: Serialize + for<'de> Deserialize<'de> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, new)]
 pub struct LudoGameIncomeHandshakePacket {
-    pub key: [u8; 32]
+    pub key: [u8; 32],
 }
 
 impl LudoPacket for LudoGameIncomeHandshakePacket {
     fn packet_type(&self) -> LudoPacketType {
-        LudoPacketType::Income
+        Income
     }
 }
 
@@ -41,6 +43,28 @@ pub struct LudoGameOutcomeHandshakeCallbackPacket {
 
 impl LudoPacket for LudoGameOutcomeHandshakeCallbackPacket {
     fn packet_type(&self) -> LudoPacketType {
-        LudoPacketType::Outcome
+        Outcome
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameIncomeProfilePacket {
+    pub profile: LudoGameProfile,
+}
+
+impl LudoPacket for LudoGameIncomeProfilePacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Income
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameOutcomeProfilePacket {
+    pub data: LudoGameProfileData,
+}
+
+impl LudoPacket for LudoGameOutcomeProfilePacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Outcome
     }
 }

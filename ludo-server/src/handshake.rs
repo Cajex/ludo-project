@@ -1,5 +1,7 @@
+use std::any::Any;
 use bevy::prelude::*;
 use bevy::utils::info;
+use bevy_renet::netcode::NetcodeServerTransport;
 use bevy_renet::renet::{ClientId, DefaultChannel, RenetServer};
 use ludo_commons::{LudoPacket, Pair};
 use ludo_commons::packets::LudoGameOutcomeHandshakeCallbackPacket;
@@ -8,7 +10,7 @@ use crate::server::LudoClientPool;
 #[derive(Component)]
 pub struct HandshakeTimer(pub Timer, pub ClientId);
 
-pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTimer>, mut client_pool: ResMut<LudoClientPool>, mut server: ResMut<RenetServer>) {
+pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTimer>, mut client_pool: ResMut<LudoClientPool>, mut server: ResMut<RenetServer>, server_transport: Res<NetcodeServerTransport>) {
     let mut clients_to_remove = Vec::new();
     let mut successfully_removed: Option<Pair<i32, ClientId>> = None;
     timer.iter_mut().for_each(|mut timer| {
@@ -27,12 +29,14 @@ pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTi
                                     DefaultChannel::ReliableOrdered,
                                     LudoGameOutcomeHandshakeCallbackPacket::new().into_string().expect("unable to serialize #(LudoGameOutcomeHandshakeCallbackPacket) packet!")
                                 );
-                                info!("Server handshake successfully! {}", client_id);
+                                if let Some(address) = server_transport.client_addr(client_id) {
+                                    info!("Server handshake successfully! {}", address);
+                                }
                             } else {
                                 server.disconnect(client_id.clone());
                                 clients_to_remove.push(client_id);
                                 info!("no answer from client. id={}", client_id);
-                                info("client disconnected.");
+                                info("client disconnected because of no successfully handshake.");
                             }
                         } else {
                             server.disconnect(client_id.clone());
@@ -43,10 +47,23 @@ pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTi
                             panic!("unexpected behavior!");
                         }
                     } else {
-                        server.disconnect(client_id.clone());
-                        clients_to_remove.push(client_id);
-                        info!("no answer from client. id={}", client_id);
-                        info("client disconnected.");
+                        for x in client_pool.ludo_clients_pool.get(&client_id).unwrap().iter() {
+                            warn!("{}", x.0)
+                        }
+                        let result = client_pool.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
+                            items.0.eq("client.handshaked") == true
+                        }).collect::<Vec<&Pair<String, Box<dyn Any + Sync + Send>>>>();
+                        if result.is_empty() {
+                            let result = client_pool.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
+                                items.0.eq("client.handshake") == true
+                            }).collect::<Vec<&Pair<String, Box<dyn Any + Sync + Send>>>>();
+                            if result.is_empty() {
+                                server.disconnect(client_id.clone());
+                                clients_to_remove.push(client_id);
+                                info!("no answer from client. id={}", client_id);
+                                info("client disconnected because of no entry.");
+                            }
+                        }
                     }
                     i+=1;
                 }
@@ -55,8 +72,11 @@ pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTi
     });
     if let Some(pair) = successfully_removed {
         if pair.0 != -1 {
-            client_pool.ludo_clients_pool.get_mut(&pair.1).unwrap().remove(pair.0.try_into().unwrap());
-            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), client_pool.ludo_clients_pool.len());
+            let mut client_pool = client_pool.ludo_clients_pool.get_mut(&pair.1).unwrap();
+            client_pool.remove(pair.0.try_into().unwrap());
+            client_pool.push(Pair::new("client.handshaked".to_string(), Box::new(true)));
+            info!("client is marked as handshaked: {}", pair.1);
+            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), client_pool.len());
         }
     } else {
         if !clients_to_remove.is_empty() {

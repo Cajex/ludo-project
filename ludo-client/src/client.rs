@@ -3,6 +3,7 @@ use std::net::UdpSocket;
 use std::time::SystemTime;
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel, RenetClient};
+use crate::{handler, handshake};
 
 #[derive(Default)]
 pub struct LudoClientPlugin {
@@ -10,13 +11,12 @@ pub struct LudoClientPlugin {
 
 impl Plugin for LudoClientPlugin {
     fn build(&self, application: &mut App) {
-        application.add_systems(Startup, Self::connect_client_system);
+        application.add_systems(Startup, Self::connect_client_system).add_systems(PostStartup, handshake::commit_handshake_system).add_systems(Update, (handler::handle_server_outcome_system));
     }
 }
 
 impl LudoClientPlugin {
     pub fn connect_client_system(mut commands: Commands) {
-
         let client = RenetClient::new(ConnectionConfig::default());
         commands.insert_resource(client);
         let address = "127.0.0.1:2000".parse().unwrap();

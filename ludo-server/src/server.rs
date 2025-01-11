@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_renet::renet::{ClientId, ConnectionConfig, DefaultChannel, RenetClient, RenetServer, ServerEvent};
 use ludo_commons::Pair;
-use crate::handshake;
+use crate::{handler, handshake};
 use crate::handshake::HandshakeTimer;
 
 #[derive(Default)]
@@ -17,12 +17,12 @@ pub struct LudoServerPlugin {
 
 #[derive(Resource, Default)]
 pub struct LudoClientPool {
-    pub ludo_clients_pool: HashMap<ClientId, Vec<Pair<String, Box<dyn Any>>>>,
+    pub ludo_clients_pool: HashMap<ClientId, Vec<Pair<String, Box<dyn Any + Sync + Send>>>>,
 }
 
 impl Plugin for LudoServerPlugin {
     fn build(&self, application: &mut App) {
-        application.add_systems(Startup, Self::enable_listener_system).add_systems(Update, (handshake::update_handshake_timer));
+        application.add_systems(Startup, Self::enable_listener_system).add_systems(Update, (Self::connect_listener, handshake::update_handshake_timer, handler::handle_client_income));
     }
 }
 

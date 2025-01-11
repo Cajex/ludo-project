@@ -1,5 +1,7 @@
+use std::any::type_name;
+use std::fmt::Display;
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
+use anyhow::{Error, Result};
 use derive_new::new;
 use crate::game::{LudoGameProfile, LudoGameProfileData};
 use crate::LudoPacketType::{Income, Outcome};
@@ -17,12 +19,31 @@ pub trait LudoPacket: Serialize + for<'de> Deserialize<'de> {
     fn packet_type(&self) -> LudoPacketType;
 
     //noinspection ALL
-    fn into_string(&self) -> Result<String> {
-        serde_json::to_string(&self).map_err(|e| e.into())
+    fn into_string<T>(&self) -> Result<String> where T: LudoPacket {
+        Ok(format!("type: {0}, data: #[{1}]#", std::any::type_name::<T>(), serde_json::to_string(&self)?))
     }
 
     fn make_packet<T>(buf: String) -> Result<T> where T: LudoPacket {
-        serde_json::from_str(&buf).map_err(|e| e.into())
+        if buf.contains(type_name::<T>()) {
+            serde_json::from_str(regex(buf)?.as_str()).map_err(|e| e.into())
+        } else {
+            Err(Error::msg(format!("Invalid packet type: {}", buf)))
+        }
+    }
+}
+
+fn regex<T>(input: T) -> Result<T> where T: Display + ToString + for<'a> From<&'a str> {
+    let input = input.to_string();
+    if let Some(start) = input.find("data: #[") {
+        let start = start + "data: #[".len();
+        if let Some(end) = input[start..].find("]#") {
+            let data = &input[start..start + end];
+            Ok(data.into())
+        } else {
+            Err(Error::msg(format!("invalid input: {}", input)))
+        }
+    } else {
+        Err(Error::msg(format!("invalid input: {}", input)))
     }
 }
 
@@ -39,6 +60,7 @@ impl LudoPacket for LudoGameIncomeHandshakePacket {
 
 #[derive(Debug, Clone, Serialize, Deserialize, new)]
 pub struct LudoGameOutcomeHandshakeCallbackPacket {
+
 }
 
 impl LudoPacket for LudoGameOutcomeHandshakeCallbackPacket {
@@ -64,6 +86,17 @@ pub struct LudoGameOutcomeProfilePacket {
 }
 
 impl LudoPacket for LudoGameOutcomeProfilePacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Outcome
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameOutcomeDisconnectPacket {
+    pub reason: String,
+}
+
+impl LudoPacket for LudoGameOutcomeDisconnectPacket {
     fn packet_type(&self) -> LudoPacketType {
         Outcome
     }

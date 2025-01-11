@@ -6,9 +6,9 @@ use std::net::UdpSocket;
 pub use std::time::{Duration, SystemTime};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use bevy_renet::renet::{ClientId, ConnectionConfig, DefaultChannel, RenetClient, RenetServer, ServerEvent};
-use ludo_commons::{game, Pair};
-use ludo_commons::game::LudoGameProfileData;
+use bevy_renet::renet::{ClientId, ConnectionConfig, RenetServer, ServerEvent};
+use ludo_commons::Pair;
+use ludo_commons::game::{LudoGameObject, LudoGameProfileData, LudoGameState};
 use crate::{backup, handler, handshake};
 use crate::backup::LudoBackupProfileTimer;
 use crate::handshake::HandshakeTimer;
@@ -18,7 +18,7 @@ pub struct LudoServerPlugin {
 }
 
 #[derive(Resource, Default)]
-pub struct LudoClientPool {
+pub struct LudoOnlineClientPool {
     pub ludo_clients_pool: HashMap<ClientId, Vec<Pair<String, Box<dyn Any + Sync + Send>>>>,
 }
 
@@ -36,7 +36,8 @@ impl LudoServerPlugin {
             let info = commands.spawn(profile.clone()).id();
             info!("loaded profile to the cache: [{}].", info);
         });
-        commands.spawn(LudoBackupProfileTimer(Timer::new(Duration::from_secs(3), TimerMode::Repeating)));
+        commands.insert_resource(LudoGameObject { state: LudoGameState::Waiting });
+        commands.spawn(LudoBackupProfileTimer(Timer::new(Duration::from_secs(9), TimerMode::Repeating)));
     }
 
     pub fn enable_listener_system(mut commands: Commands) {
@@ -55,12 +56,12 @@ impl LudoServerPlugin {
 
         let transport = NetcodeServerTransport::new(udp_server_config, udp_server_interface).unwrap();
         commands.insert_resource(transport);
-        commands.insert_resource(LudoClientPool::default());
+        commands.insert_resource(LudoOnlineClientPool::default());
         info!("listening server socket on {}", address);
 
     }
 
-    pub fn connect_listener(mut commands: Commands, mut server_event: EventReader<ServerEvent>, mut client_pool: ResMut<LudoClientPool>, server_transport: Res<NetcodeServerTransport>) {
+    pub fn connect_listener(mut commands: Commands, mut server_event: EventReader<ServerEvent>, mut client_pool: ResMut<LudoOnlineClientPool>, server_transport: Res<NetcodeServerTransport>) {
         for server_event in server_event.read() {
             match server_event {
                 ServerEvent::ClientConnected { client_id } => {
@@ -80,7 +81,7 @@ impl LudoServerPlugin {
     }
 
     pub fn disable_application_system(mut event_reader: EventReader<AppExit>, profiles: Query<&LudoGameProfileData>) {
-        event_reader.read().for_each(move |exit_event| {
+        event_reader.read().for_each(move |_exit_event| {
             info!("exit event.");
             let mut list = vec![];
             profiles.iter().for_each(|profile| {

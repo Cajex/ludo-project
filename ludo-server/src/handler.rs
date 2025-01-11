@@ -1,13 +1,12 @@
 use bevy::log::warn;
-use crate::server::LudoClientPool;
+use crate::server::LudoOnlineClientPool;
 use bevy::prelude::*;
-use bevy::utils::info;
 use bevy_renet::renet::{DefaultChannel, RenetServer};
-use ludo_commons::{packets, security, LudoPacket, Pair};
+use ludo_commons::{security, LudoPacket, Pair};
 use ludo_commons::game::LudoGameProfileData;
 use ludo_commons::packets::{LudoGameIncomeHandshakePacket, LudoGameIncomeProfilePacket, LudoGameOutcomeProfilePacket};
 
-pub fn handle_client_income(mut commands: Commands, mut server: ResMut<RenetServer>, mut ludo_client_pool: ResMut<LudoClientPool>, mut profile_data: Query<&mut LudoGameProfileData>) {
+pub fn handle_client_income(mut commands: Commands, mut server: ResMut<RenetServer>, mut ludo_client_pool: ResMut<LudoOnlineClientPool>, mut profile_data: Query<&mut LudoGameProfileData>) {
     let mut clients_to_remove = Vec::new();
     let client_ids: Vec<_> = server.clients_id_iter().collect();
     for client_id in client_ids {
@@ -39,25 +38,25 @@ pub fn handle_client_income(mut commands: Commands, mut server: ResMut<RenetServ
                     }
                 } else {
                     if let Ok(profile_income_packet) = <LudoGameIncomeProfilePacket as LudoPacket>::make_packet::<LudoGameIncomeProfilePacket>(raw_data.clone()) {
-                        info!("client successfully sent profile data: {:?}", profile_income_packet.profile);
                         ludo_client_pool.ludo_clients_pool.get_mut(&client_id).unwrap().push(Pair::new("server.profile".to_string(), Box::new(profile_income_packet.profile.clone())));
                         let mut found = false;
                         profile_data.iter_mut().for_each(|profile_data| {
                             if profile_data.unique_id.eq(&profile_income_packet.profile.unique_id.clone()) {
                                 let packet = LudoGameOutcomeProfilePacket::new(profile_data.clone());
-                                server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string().unwrap());
+                                server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string::<LudoGameOutcomeProfilePacket>().unwrap());
                                 found = true;
                                 info!("Client successfully sent profile data: {:?}", profile_income_packet.profile);
                             }
                         });
                         if !found {
+                            info!("Client profile not found in database: {:?}", profile_income_packet.profile.unique_id);
                             let profile_data = LudoGameProfileData {
                                 unique_id: profile_income_packet.profile.unique_id.clone(),
                                 points: 0,
                             };
                             commands.spawn(profile_data.clone());
                             let packet = LudoGameOutcomeProfilePacket::new(profile_data);
-                            server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string().unwrap());
+                            server.send_message(client_id, DefaultChannel::ReliableOrdered, packet.into_string::<LudoGameOutcomeProfilePacket>().unwrap());
                             info!("Client successfully sent profile data: {:?}", profile_income_packet.profile);
                             info!("a new profile data were created!")
                         }

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use std::net::UdpSocket;
 use std::time::SystemTime;
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
-use bevy_renet::renet::{ConnectionConfig, DefaultChannel, RenetClient};
+use bevy_renet::renet::{ConnectionConfig, RenetClient};
 use ludo_commons::game::LudoGameProfile;
 use crate::{handler, handshake};
 

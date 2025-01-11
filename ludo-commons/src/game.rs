@@ -11,11 +11,11 @@ pub struct LudoGameObject {
     pub state: LudoGameState,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub enum LudoGameState {
     Waiting,
     InGame,
-    Closing
+    Closing,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Component)]
@@ -78,13 +78,14 @@ impl LudoGameProfile {
             }
         } else {
             let mut open_options = OpenOptions::new().write(true).create(true).open(file_path)?;
+            let unique_id = *Uuid::new_v4().as_bytes();
             open_options.write_all(serde_json::to_string::<LudoGameProfile>(&LudoGameProfile {
-                unique_id: *Uuid::new_v4().as_bytes(),
+                unique_id: unique_id.clone(),
                 nickname: "default".to_string(),
                 age: 17,
             })?.as_bytes()).expect("Could not write data");
             Ok(LudoGameProfile {
-                unique_id: *Uuid::new_v4().as_bytes(),
+                unique_id,
                 nickname: "default".to_string(),
                 age: 17,
             })

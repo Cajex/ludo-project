@@ -12,7 +12,11 @@ pub struct LudoClientPlugin {
 
 impl Plugin for LudoClientPlugin {
     fn build(&self, application: &mut App) {
-        application.add_systems(PreStartup, Self::enable_system).add_systems(Startup, Self::connect_client_system).add_systems(PostStartup, handshake::commit_handshake_system).add_systems(Update, handler::handle_server_outcome_system);
+        application
+            .add_systems(PreStartup, Self::enable_system)
+            .add_systems(Startup, Self::connect_client_system)
+            .add_systems(PostStartup, handshake::commit_handshake_system)
+            .add_systems(Update, handler::handle_server_outcome_system);
     }
 }
 

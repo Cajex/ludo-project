@@ -7,3 +7,4 @@ edition = "2021"
 bevy = "0.15.1"
 bevy_renet = { version = "1.0.0", features = ["netcode"] }
 ludo-commons = { path = "../ludo-commons" }
+derive-new = "0.7.0"

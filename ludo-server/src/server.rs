@@ -7,14 +7,20 @@ pub use std::time::{Duration, SystemTime};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_renet::renet::{ClientId, ConnectionConfig, RenetServer, ServerEvent};
+use derive_new::new;
 use ludo_commons::Pair;
-use ludo_commons::game::{LudoGameObject, LudoGameProfileData, LudoGameState};
+use ludo_commons::game::{LudoGameObject, LudoGameProfile, LudoGameProfileData, LudoGameState};
 use crate::{backup, handler, handshake};
 use crate::backup::LudoBackupProfileTimer;
 use crate::handshake::HandshakeTimer;
 
 #[derive(Default)]
 pub struct LudoServerPlugin {
+}
+
+#[derive(Resource, new)]
+pub struct LudoGameConfiguration {
+    pub min_players_to_start: u8,
 }
 
 #[derive(Resource, Default)]
@@ -24,7 +30,20 @@ pub struct LudoOnlineClientPool {
 
 impl Plugin for LudoServerPlugin {
     fn build(&self, application: &mut App) {
-        application.add_systems(PreStartup, Self::enable_system).add_systems(Startup, Self::enable_listener_system).add_systems(Update, (Self::connect_listener, handshake::update_handshake_timer, handler::handle_client_income, Self::disable_application_system, backup::handle_backup_profile_timer));
+        application
+            .insert_resource(LudoGameConfiguration::new(4))
+            .add_systems(PreStartup, Self::enable_system)
+            .add_systems(Startup, Self::enable_listener_system)
+            .add_systems(
+                Update,
+                (
+                    Self::connect_listener,
+                    handshake::update_handshake_timer,
+                    handler::handle_client_income,
+                    Self::disable_application_system,
+                    backup::handle_backup_profile_timer
+                )
+            );
     }
 }
 
@@ -61,7 +80,12 @@ impl LudoServerPlugin {
 
     }
 
-    pub fn connect_listener(mut commands: Commands, mut server_event: EventReader<ServerEvent>, mut client_pool: ResMut<LudoOnlineClientPool>, server_transport: Res<NetcodeServerTransport>) {
+    pub fn connect_listener(
+        mut commands: Commands,
+        mut server_event: EventReader<ServerEvent>,
+        mut client_pool: ResMut<LudoOnlineClientPool>,
+        server_transport: Res<NetcodeServerTransport>
+    ) {
         for server_event in server_event.read() {
             match server_event {
                 ServerEvent::ClientConnected { client_id } => {
@@ -90,6 +114,19 @@ impl LudoServerPlugin {
             LudoGameProfileData::load_to_file("profiles.json", list).expect("unable to save ludo game profiles!");
             info!("disabled ludo game profiles");
         })
+    }
+
+    pub fn ludo_game_update(
+        configuration: Res<LudoGameConfiguration>,
+        mut game_object: ResMut<LudoGameObject>,
+        online_profile_pool: Res<LudoOnlineClientPool>,
+        mut data_pool: Query<&mut LudoGameProfileData>
+    ) {
+        if game_object.state == LudoGameState::Waiting {
+            if online_profile_pool.ludo_clients_pool.len() >= configuration.min_players_to_start as usize {
+                /* todo: start the game */
+            }
+        }
     }
 
 }

@@ -11,7 +11,14 @@ use crate::server::LudoOnlineClientPool;
 #[derive(Component)]
 pub struct HandshakeTimer(pub Timer, pub ClientId);
 
-pub fn update_handshake_timer(time: Res<Time>, mut timer: Query<&mut HandshakeTimer>, mut client_pool: ResMut<LudoOnlineClientPool>, mut server: ResMut<RenetServer>, server_transport: Res<NetcodeServerTransport>, game_object: Res<LudoGameObject>) {
+pub fn update_handshake_timer(
+    time: Res<Time>,
+    mut timer: Query<&mut HandshakeTimer>,
+    mut client_pool: ResMut<LudoOnlineClientPool>,
+    mut server: ResMut<RenetServer>,
+    server_transport: Res<NetcodeServerTransport>,
+    game_object: Res<LudoGameObject>
+) {
     let mut clients_to_remove = Vec::new();
     let mut successfully_removed: Option<Pair<i32, ClientId>> = None;
     timer.iter_mut().for_each(|mut timer| {

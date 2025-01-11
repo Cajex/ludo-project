@@ -6,7 +6,12 @@ use ludo_commons::{security, LudoPacket, Pair};
 use ludo_commons::game::LudoGameProfileData;
 use ludo_commons::packets::{LudoGameIncomeHandshakePacket, LudoGameIncomeProfilePacket, LudoGameOutcomeProfilePacket};
 
-pub fn handle_client_income(mut commands: Commands, mut server: ResMut<RenetServer>, mut ludo_client_pool: ResMut<LudoOnlineClientPool>, mut profile_data: Query<&mut LudoGameProfileData>) {
+pub fn handle_client_income(
+    mut commands: Commands,
+    mut server: ResMut<RenetServer>,
+    mut ludo_client_pool: ResMut<LudoOnlineClientPool>,
+    mut profile_data: Query<&mut LudoGameProfileData>
+) {
     let mut clients_to_remove = Vec::new();
     let client_ids: Vec<_> = server.clients_id_iter().collect();
     for client_id in client_ids {

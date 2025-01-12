@@ -3,7 +3,7 @@ use bevy::prelude::{error, Query, ResMut};
 use bevy_renet::renet::{DefaultChannel, RenetClient};
 use ludo_commons::game::LudoGameProfile;
 use ludo_commons::LudoPacket;
-use ludo_commons::packets::{LudoGameIncomeProfilePacket, LudoGameOutcomeDisconnectPacket, LudoGameOutcomeHandshakeCallbackPacket, LudoGameOutcomeProfilePacket};
+use ludo_commons::packets::{LudoGameIncomeProfilePacket, LudoGameOutcomeDisconnectPacket, LudoGameOutcomeGameStartPacket, LudoGameOutcomeHandshakeCallbackPacket, LudoGameOutcomeProfilePacket};
 
 pub fn handle_server_outcome_system(mut client: ResMut<RenetClient>, profile: Query<&LudoGameProfile>) {
     let outcome_message = client.receive_message(DefaultChannel::ReliableOrdered);
@@ -20,6 +20,11 @@ pub fn handle_server_outcome_system(mut client: ResMut<RenetClient>, profile: Qu
             } else {
                 if let Ok(disconnect_packet) = LudoGameOutcomeDisconnectPacket::make_packet::<LudoGameOutcomeDisconnectPacket>(String::from_utf8_lossy(&outcome_message).to_string()) {
                     error!("disconnection received: {}!", disconnect_packet.reason);
+                } else {
+                    if let Ok(game_start_packet) = LudoGameOutcomeGameStartPacket::make_packet::<LudoGameOutcomeGameStartPacket>(String::from_utf8_lossy(&outcome_message).to_string()) {
+                        info!("game is starting...!");
+
+                    }
                 }
             }
         }

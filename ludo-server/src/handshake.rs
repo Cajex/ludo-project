@@ -41,6 +41,7 @@ pub fn update_handshake_timer(
                                             DefaultChannel::ReliableOrdered,
                                             LudoGameOutcomeHandshakeCallbackPacket::new().into_string::<LudoGameOutcomeHandshakeCallbackPacket>().expect("unable to serialize #(LudoGameOutcomeHandshakeCallbackPacket) packet!")
                                         );
+
                                         if let Some(address) = server_transport.client_addr(client_id) {
                                             info!("Server handshake successfully! {}", address);
                                         }

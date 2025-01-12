@@ -6,10 +6,11 @@ use std::net::UdpSocket;
 pub use std::time::{Duration, SystemTime};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use bevy_renet::renet::{ClientId, ConnectionConfig, RenetServer, ServerEvent};
+use bevy_renet::renet::{ClientId, ConnectionConfig, DefaultChannel, RenetServer, ServerEvent};
 use derive_new::new;
-use ludo_commons::Pair;
+use ludo_commons::{LudoPacket, Pair};
 use ludo_commons::game::{LudoGameObject, LudoGameProfile, LudoGameProfileData, LudoGameState};
+use ludo_commons::packets::LudoGameOutcomeGameStartPacket;
 use crate::{backup, handler, handshake};
 use crate::backup::LudoBackupProfileTimer;
 use crate::handshake::HandshakeTimer;
@@ -21,6 +22,7 @@ pub struct LudoServerPlugin {
 #[derive(Resource, new)]
 pub struct LudoGameConfiguration {
     pub min_players_to_start: u8,
+    pub max_players_to_start: u8,
 }
 
 #[derive(Resource, Default)]
@@ -31,7 +33,7 @@ pub struct LudoOnlineClientPool {
 impl Plugin for LudoServerPlugin {
     fn build(&self, application: &mut App) {
         application
-            .insert_resource(LudoGameConfiguration::new(4))
+            .insert_resource(LudoGameConfiguration::new(4, 4))
             .add_systems(PreStartup, Self::enable_system)
             .add_systems(Startup, Self::enable_listener_system)
             .add_systems(
@@ -84,17 +86,28 @@ impl LudoServerPlugin {
         mut commands: Commands,
         mut server_event: EventReader<ServerEvent>,
         mut client_pool: ResMut<LudoOnlineClientPool>,
-        server_transport: Res<NetcodeServerTransport>
+        server_transport: Res<NetcodeServerTransport>,
+        game_object: Res<LudoGameObject>,
+        configuration: Res<LudoGameConfiguration>,
+        mut server: ResMut<RenetServer>
     ) {
         for server_event in server_event.read() {
             match server_event {
                 ServerEvent::ClientConnected { client_id } => {
-                    client_pool.ludo_clients_pool.insert(*client_id, Vec::new());
-                    if let Some(address) = server_transport.client_addr(client_id.clone()) {
-                        info!("new client connected id: {0}, address: {1}", client_id, address);
+                    if game_object.state == LudoGameState::Waiting {
+                        if client_pool.ludo_clients_pool.len() < configuration.max_players_to_start as usize {
+                            client_pool.ludo_clients_pool.insert(*client_id, Vec::new());
+                            if let Some(address) = server_transport.client_addr(client_id.clone()) {
+                                info!("new client connected id: {0}, address: {1}", client_id, address);
+                            }
+                            client_pool.ludo_clients_pool.get_mut(&*client_id).unwrap().push(Pair::new("client.handshake".to_string(), Box::new(false)));
+                            commands.spawn(HandshakeTimer(Timer::new(Duration::from_millis(500), TimerMode::Once), client_id.clone()));
+                        } else {
+                            server.disconnect(client_id.clone());
+                        }
+                    } else {
+                        server.disconnect(client_id.clone());
                     }
-                    client_pool.ludo_clients_pool.get_mut(&*client_id).unwrap().push(Pair::new("client.handshake".to_string(), Box::new(false)));
-                    commands.spawn(HandshakeTimer(Timer::new(Duration::from_millis(500), TimerMode::Once), client_id.clone()));
                 }
                 ServerEvent::ClientDisconnected { client_id, reason } => {
                     client_pool.ludo_clients_pool.remove(*&client_id);
@@ -120,11 +133,16 @@ impl LudoServerPlugin {
         configuration: Res<LudoGameConfiguration>,
         mut game_object: ResMut<LudoGameObject>,
         online_profile_pool: Res<LudoOnlineClientPool>,
-        mut data_pool: Query<&mut LudoGameProfileData>
+        mut data_pool: Query<&mut LudoGameProfileData>,
+        mut server: ResMut<RenetServer>
     ) {
         if game_object.state == LudoGameState::Waiting {
             if online_profile_pool.ludo_clients_pool.len() >= configuration.min_players_to_start as usize {
-                /* todo: start the game */
+                for client in online_profile_pool.ludo_clients_pool.iter() {
+                    let start_packet = LudoGameOutcomeGameStartPacket::new().into_string::<LudoGameOutcomeGameStartPacket>().expect("unable to parse packet into string");
+                    server.send_message(client.0.clone(), DefaultChannel::ReliableOrdered, start_packet);
+                }
+                info!("ludo game is starting...");
             }
         }
     }

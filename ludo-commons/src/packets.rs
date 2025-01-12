@@ -101,3 +101,14 @@ impl LudoPacket for LudoGameOutcomeDisconnectPacket {
         Outcome
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameOutcomeGameStartPacket {
+
+}
+
+impl LudoPacket for LudoGameOutcomeGameStartPacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Outcome
+    }
+}

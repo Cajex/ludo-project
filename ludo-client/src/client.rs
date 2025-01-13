@@ -1,9 +1,15 @@
+use std::fs::File;
 use bevy::prelude::*;
 use std::net::UdpSocket;
 use std::time::SystemTime;
-use bevy::winit::WinitSettings;
+use bevy::image;
+use bevy::render::render_resource::Texture;
+use bevy::window::PrimaryWindow;
+use bevy::winit::{WinitSettings, WinitWindows};
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, RenetClient};
+use imageun::ImageReader;
+use winit::window::Icon;
 use ludo_commons::game::LudoGameProfile;
 use crate::{handler, handshake};
 
@@ -22,10 +28,15 @@ impl Plugin for LudoClientPlugin {
 }
 
 impl LudoClientPlugin {
-    pub fn enable_system(mut commands: Commands) {
+    pub fn enable_system(mut commands: Commands, window: NonSend<WinitWindows>, main_window: Query<Entity, With<PrimaryWindow>>, asset_server: Res<AssetServer>, mut texture_assets: ResMut<Assets<Image>>) {
         let result = LudoGameProfile::load_from_file("game-profile.json").expect("unable to load ludo game profile");
         info!("load game profile...");
         commands.spawn(result);
+
+        let Some(primary) = window.get_window(main_window.single()) else {return};
+        let image = ImageReader::open("ludo-client/assets/client.image.icon.png").unwrap().decode().unwrap().into_rgba8();
+        let rgba = image.as_raw();
+        primary.set_window_icon(Some(Icon::from_rgba(rgba.clone(), image.width(), image.height()).unwrap()));
     }
 
     pub fn connect_client_system(mut commands: Commands) {

@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+image = "0.25.5"
 bevy = "0.15.1"
 bevy_renet = { version = "1.0.0", features = ["netcode"] }
 ludo-commons = { path = "../ludo-commons" }
+winit = "0.30.8"
+imageun = "0.0.0"
+bevy_simple_text_input = "0.10.1"

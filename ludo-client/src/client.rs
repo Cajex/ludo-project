@@ -17,9 +17,13 @@ use crate::{handler, handshake};
 pub struct LudoClientPlugin {
 }
 
+#[derive(Event)]
+pub struct LudoClientChangeStateEvent;
+
 impl Plugin for LudoClientPlugin {
     fn build(&self, application: &mut App) {
         application
+            .add_event::<LudoClientChangeStateEvent>()
             .add_systems(PreStartup, Self::enable_system)
             .add_systems(Startup, Self::connect_client_system)
             .add_systems(PostStartup, handshake::commit_handshake_system)

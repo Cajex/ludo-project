@@ -2,6 +2,7 @@ mod server;
 mod handshake;
 mod handler;
 mod backup;
+mod communication;
 
 use bevy::log::tracing_subscriber;
 use bevy::prelude::*;

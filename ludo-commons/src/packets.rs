@@ -112,3 +112,14 @@ impl LudoPacket for LudoGameOutcomeGameStartPacket {
         Outcome
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameOutcomePlayerProfilesPacket {
+    pub list: Vec<LudoGameProfile>,
+}
+
+impl LudoPacket for LudoGameOutcomePlayerProfilesPacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Outcome
+    }
+}

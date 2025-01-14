@@ -11,8 +11,9 @@ use derive_new::new;
 use ludo_commons::{LudoPacket, Pair};
 use ludo_commons::game::{LudoGameObject, LudoGameProfile, LudoGameProfileData, LudoGameState};
 use ludo_commons::packets::LudoGameOutcomeGameStartPacket;
-use crate::{backup, handler, handshake};
+use crate::{backup, communication, handler, handshake};
 use crate::backup::LudoBackupProfileTimer;
+use crate::communication::LudoProfilesInfoTimer;
 use crate::handshake::HandshakeTimer;
 
 #[derive(Default)]
@@ -43,7 +44,8 @@ impl Plugin for LudoServerPlugin {
                     handshake::update_handshake_timer,
                     handler::handle_client_income,
                     Self::disable_application_system,
-                    backup::handle_backup_profile_timer
+                    backup::handle_backup_profile_timer,
+                    communication::handle_client_outcome_profiles_info,
                 )
             );
     }
@@ -59,6 +61,7 @@ impl LudoServerPlugin {
         });
         commands.insert_resource(LudoGameObject { state: LudoGameState::Waiting });
         commands.spawn(LudoBackupProfileTimer(Timer::new(Duration::from_secs(9), TimerMode::Repeating)));
+        commands.spawn(LudoProfilesInfoTimer(Timer::new(Duration::from_secs(2), TimerMode::Repeating)));
     }
 
     pub fn enable_listener_system(mut commands: Commands) {
@@ -147,4 +150,41 @@ impl LudoServerPlugin {
         }
     }
 
+}
+
+impl LudoOnlineClientPool {
+    pub fn get_information<T: 'static>(&self, client: &ClientId, info: &str) -> Option<&T> {
+        if let Some(profile_cache) = self.ludo_clients_pool.get(client) {
+            for item in profile_cache {
+                if item.0 == info {
+                    let cast = item.1.as_ref().downcast_ref::<T>().expect("unable to cast target information");
+                    return Some(cast);
+                }
+            }
+            None
+        } else { None }
+    }
+
+    pub fn set_information<T>(&mut self, client: &ClientId, info: &str, some: T) where T: Any + Sync + Send {
+        if let Some(profile_cache) = self.ludo_clients_pool.get_mut(client) {
+            let mut i = 0;
+            let mut bool = false;
+            for item in &mut *profile_cache {
+                if item.0 == info {
+                    bool = true;
+                    break;
+                }
+                i+=1;
+            }
+            if bool {
+                profile_cache.insert(i, Pair::new(info.to_string(), Box::new(some)));
+            } else {
+                profile_cache.push(Pair::new(info.to_string(), Box::new(some)));
+            }
+        }
+    }
+
+    pub fn is_handshaked(&self, client: &ClientId) -> bool {
+        self.get_information::<bool>(client, "client.handshaked").is_some()
+    }
 }

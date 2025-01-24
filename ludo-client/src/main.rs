@@ -2,6 +2,7 @@ mod client;
 mod handshake;
 mod handler;
 mod interface;
+mod game;
 
 use crate::client::LudoClientPlugin;
 use crate::interface::LudoClientUserInterfacePlugin;

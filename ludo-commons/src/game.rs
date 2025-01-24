@@ -1,9 +1,10 @@
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use bevy::prelude::{Component, Resource};
+use bevy::prelude::{Component, Resource, States};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use derive_new::new;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Resource)]
@@ -11,8 +12,9 @@ pub struct LudoGameObject {
     pub state: LudoGameState,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, States, Default, Hash)]
 pub enum LudoGameState {
+    #[default]
     Waiting,
     InGame,
     Closing,
@@ -29,6 +31,12 @@ pub struct LudoGameProfile {
 pub struct LudoGameProfileData {
     pub unique_id: [u8; 16],
     pub points: u128,
+}
+
+#[derive(Resource, new)]
+pub struct LudoGameConfiguration {
+    pub min_players_to_start: u8,
+    pub max_players_to_start: u8,
 }
 
 impl LudoGameProfileData {

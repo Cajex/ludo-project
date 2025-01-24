@@ -6,6 +6,7 @@ use bevy_simple_text_input::{TextInput, TextInputTextColor, TextInputValue};
 use std::thread;
 use std::time::Duration;
 use bevy::winit::WinitSettings;
+use ludo_commons::game::LudoGameConfiguration;
 
 const IMAGE_HEIGHT: f32 = 1024.;
 const IMAGE_WIDTH: f32 = 1366.;
@@ -45,6 +46,9 @@ pub struct LudoInterfacePingMenuComponent;
 
 #[derive(Component)]
 pub struct LudoInterfaceWaitingMenuProfileDescriptorComponent(pub bool, pub u8);
+
+#[derive(Component)]
+pub struct LudoInterfaceWaitingMenuMinimumPlayersComponent;
 
 impl LudoClientUserInterfacePlugin {
     pub fn enable_server_ping_menu_interface(mut commands: Commands, mut window: Query<&mut Window>, asset_server: Res<AssetServer>, connection_stable: Res<LudoClientConnectionStable>) {
@@ -177,6 +181,17 @@ impl LudoClientUserInterfacePlugin {
                     menu_commands.with_children(|parent| {
                         parent.spawn(Node {
                             position_type: PositionType::Absolute,
+                            top: Val::Percent(45.),
+                            flex_direction: FlexDirection::Row,
+                            ..default()
+                        }).with_children(|parent| {
+                            parent.spawn((Text("Required players: ".to_string()), TextFont::from_font_size(18.), TextColor::from(Color::WHITE)));
+                            parent.spawn((Text("/".to_string()), TextFont::from_font_size(18.), TextColor::from(Color::xyz(0.57, 0.55, 0.10)), LudoInterfaceWaitingMenuMinimumPlayersComponent));
+                            parent.spawn((Text(" | of: ".to_string()), TextFont::from_font_size(18.), TextColor::from(Color::WHITE)));
+                            parent.spawn((Text("4".to_string()), TextFont::from_font_size(18.), TextColor::from( Color::xyz(0.41, 0.21, 0.02))));
+                        });
+                        parent.spawn(Node {
+                            position_type: PositionType::Absolute,
                             align_items: AlignItems::DEFAULT,
                             flex_direction: FlexDirection::Row,
                             row_gap: Val::Px(50.),
@@ -228,13 +243,14 @@ impl LudoClientUserInterfacePlugin {
                         if component.0 {
                             text.0 = profile.nickname.clone();
                         } else {
+                            text.0 = "online".to_string();
                             color.0 = Color::xyz(0.39, 0.73, 0.24);
                         }
                     } else {
                         if component.0 {
                             text.0 = "unknown".to_string();
                         } else {
-                            text.0 = "online".to_string();
+                            text.0 = "offline".to_string();
                             color.0 = Color::xyz(0.41, 0.21, 0.02);
                         }
                     }
@@ -242,6 +258,12 @@ impl LudoClientUserInterfacePlugin {
             }
             LudoClientGameState::GameMenu => {}
         }
+    }
+
+    pub fn client_load_minimum_players_system(mut min_players_query: Query<&mut Text, (With<LudoInterfaceWaitingMenuMinimumPlayersComponent>, Without<LudoInterfaceWaitingMenuProfileDescriptorComponent>)>, server_configuration: Res<LudoGameConfiguration>) {
+        min_players_query.iter_mut().for_each(|mut text| {
+            text.0 = format!("{}", server_configuration.min_players_to_start);
+        });
     }
 
 }

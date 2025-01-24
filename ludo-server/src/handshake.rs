@@ -1,3 +1,4 @@
+use ludo_commons::game::LudoGameConfiguration;
 use std::any::Any;
 use bevy::prelude::*;
 use bevy::utils::info;
@@ -5,7 +6,7 @@ use bevy_renet::netcode::NetcodeServerTransport;
 use bevy_renet::renet::{ClientId, DefaultChannel, RenetServer};
 use ludo_commons::{LudoPacket, Pair};
 use ludo_commons::game::{LudoGameObject, LudoGameState};
-use ludo_commons::packets::{LudoGameOutcomeDisconnectPacket, LudoGameOutcomeHandshakeCallbackPacket};
+use ludo_commons::packets::{LudoGameOutcomeDisconnectPacket, LudoGameOutcomeHandshakeCallbackPacket, LudoGameOutcomeServerDataPacket};
 use crate::server::LudoOnlineClientPool;
 
 #[derive(Component)]
@@ -14,17 +15,18 @@ pub struct HandshakeTimer(pub Timer, pub ClientId);
 pub fn update_handshake_timer(
     time: Res<Time>,
     mut timer: Query<&mut HandshakeTimer>,
-    mut client_pool: ResMut<LudoOnlineClientPool>,
+    mut online_clients: ResMut<LudoOnlineClientPool>,
     mut server: ResMut<RenetServer>,
     server_transport: Res<NetcodeServerTransport>,
-    game_object: Res<LudoGameObject>
+    game_object: Res<LudoGameObject>,
+    configuration: Res<LudoGameConfiguration>
 ) {
     let mut clients_to_remove = Vec::new();
     let mut successfully_removed: Option<Pair<i32, ClientId>> = None;
     timer.iter_mut().for_each(|mut timer| {
         if timer.0.tick(time.delta()).just_finished() {
             let client_id = timer.1.clone();
-            let client_handshake = client_pool.ludo_clients_pool.get(&client_id);
+            let client_handshake = online_clients.ludo_clients_pool.get(&client_id);
             if let Some(client_handshake) = client_handshake {
                 let mut i: i32 = -1;
                 for items in client_handshake {
@@ -34,7 +36,7 @@ pub fn update_handshake_timer(
 
                                 /* client can join */
                                 if game_object.state == LudoGameState::Waiting {
-                                    if client_pool.ludo_clients_pool.len() < 4 {
+                                    if online_clients.ludo_clients_pool.len() < 4 {
                                         successfully_removed = Some(Pair::new(i+1, client_id));
                                         server.send_message(
                                             client_id.clone(),
@@ -79,11 +81,11 @@ pub fn update_handshake_timer(
                             panic!("unexpected behavior!");
                         }
                     } else {
-                        let result = client_pool.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
+                        let result = online_clients.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
                             item.0.eq("client.handshaked") == true
                         }).collect::<Vec<&Pair<String, Box<dyn Any + Sync + Send>>>>();
                         if result.is_empty() {
-                            let result = client_pool.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
+                            let result = online_clients.ludo_clients_pool.get(&client_id).unwrap().iter().filter(|item| -> bool {
                                 item.0.eq("client.handshake") == true
                             }).collect::<Vec<&Pair<String, Box<dyn Any + Sync + Send>>>>();
                             if result.is_empty() {
@@ -101,18 +103,19 @@ pub fn update_handshake_timer(
     });
     if let Some(pair) = successfully_removed {
         if pair.0 != -1 {
-            let client_pool = client_pool.ludo_clients_pool.get_mut(&pair.1).unwrap();
-            client_pool.remove(pair.0.try_into().unwrap());
-            client_pool.push(Pair::new("client.handshaked".to_string(), Box::new(true)));
+            let client_cached = online_clients.ludo_clients_pool.get_mut(&pair.1).unwrap();
+            client_cached.remove(pair.0.try_into().unwrap());
+            client_cached.push(Pair::new("client.handshaked".to_string(), Box::new(true)));
             info!("client is marked as handshaked: {}", pair.1);
-            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), client_pool.len());
+            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), client_cached.len());
+            online_clients.send_packet(pair.1, LudoGameOutcomeServerDataPacket::new(configuration.min_players_to_start.into()), &mut server);
         }
     } else {
         if !clients_to_remove.is_empty() {
             for client_id in clients_to_remove {
-                client_pool.ludo_clients_pool.remove(&client_id);
+                online_clients.ludo_clients_pool.remove(&client_id);
             }
-            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), client_pool.ludo_clients_pool.len());
+            info!("current connected clients: {0} and registered: {1}", server.connected_clients(), online_clients.ludo_clients_pool.len());
         }
     }
 }

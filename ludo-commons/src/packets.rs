@@ -123,3 +123,14 @@ impl LudoPacket for LudoGameOutcomePlayerProfilesPacket {
         Outcome
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, new)]
+pub struct LudoGameOutcomeServerDataPacket {
+    pub min_players: usize,
+}
+
+impl LudoPacket for LudoGameOutcomeServerDataPacket {
+    fn packet_type(&self) -> LudoPacketType {
+        Outcome
+    }
+}

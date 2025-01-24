@@ -13,7 +13,7 @@ use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, RenetClient};
 use imageun::ImageReader;
 use winit::window::Icon;
-use ludo_commons::game::LudoGameProfile;
+use ludo_commons::game::{LudoGameConfiguration, LudoGameProfile};
 use crate::{handler, handshake, interface};
 use crate::handler::handle_server_outcome_system;
 use crate::interface::LudoClientGameState;
@@ -39,6 +39,7 @@ impl Plugin for LudoClientPlugin {
         application
             .add_event::<LudoClientChangeStateEvent>()
             .insert_resource(LudoClientConnectionStable(None))
+            .insert_resource(LudoGameConfiguration { min_players_to_start: 0, max_players_to_start: 4 })
             .add_systems(PreStartup, Self::enable_system)
             .add_systems(Update, handle_server_outcome_system.run_if(in_state(LudoClientGameState::WaitingMenu)))
             .insert_resource(LudoClientCachedOnlinePlayersProfiles(vec![]));

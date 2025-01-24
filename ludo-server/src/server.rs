@@ -5,11 +5,13 @@ use std::any::Any;
 use std::net::UdpSocket;
 pub use std::time::{Duration, SystemTime};
 use bevy::prelude::*;
+use bevy::reflect::erased_serde::__private::serde::de::DeserializeOwned;
+use bevy::reflect::erased_serde::Serialize;
 use bevy::utils::HashMap;
 use bevy_renet::renet::{ClientId, ConnectionConfig, DefaultChannel, RenetServer, ServerEvent};
 use derive_new::new;
 use ludo_commons::{LudoPacket, Pair};
-use ludo_commons::game::{LudoGameObject, LudoGameProfile, LudoGameProfileData, LudoGameState};
+use ludo_commons::game::{LudoGameConfiguration, LudoGameObject, LudoGameProfile, LudoGameProfileData, LudoGameState};
 use ludo_commons::packets::LudoGameOutcomeGameStartPacket;
 use crate::{backup, communication, handler, handshake};
 use crate::backup::LudoBackupProfileTimer;
@@ -20,12 +22,6 @@ use crate::handshake::HandshakeTimer;
 pub struct LudoServerPlugin {
 }
 
-#[derive(Resource, new)]
-pub struct LudoGameConfiguration {
-    pub min_players_to_start: u8,
-    pub max_players_to_start: u8,
-}
-
 #[derive(Resource, Default)]
 pub struct LudoOnlineClientPool {
     pub ludo_clients_pool: HashMap<ClientId, Vec<Pair<String, Box<dyn Any + Sync + Send>>>>,
@@ -34,7 +30,8 @@ pub struct LudoOnlineClientPool {
 impl Plugin for LudoServerPlugin {
     fn build(&self, application: &mut App) {
         application
-            .insert_resource(LudoGameConfiguration::new(4, 4))
+            .init_state::<LudoGameState>()
+            .insert_resource(LudoGameConfiguration::new(1, 4))
             .add_systems(PreStartup, Self::enable_system)
             .add_systems(Startup, Self::enable_listener_system)
             .add_systems(
@@ -46,6 +43,7 @@ impl Plugin for LudoServerPlugin {
                     Self::disable_application_system,
                     backup::handle_backup_profile_timer,
                     communication::handle_client_outcome_profiles_info,
+                    Self::ludo_game_update.run_if(in_state(LudoGameState::Waiting))
                 )
             );
     }
@@ -133,10 +131,10 @@ impl LudoServerPlugin {
     }
 
     pub fn ludo_game_update(
+        mut commands: Commands,
         configuration: Res<LudoGameConfiguration>,
         mut game_object: ResMut<LudoGameObject>,
         online_profile_pool: Res<LudoOnlineClientPool>,
-        mut data_pool: Query<&mut LudoGameProfileData>,
         mut server: ResMut<RenetServer>
     ) {
         if game_object.state == LudoGameState::Waiting {
@@ -146,6 +144,7 @@ impl LudoServerPlugin {
                     server.send_message(client.0.clone(), DefaultChannel::ReliableOrdered, start_packet);
                 }
                 info!("ludo game is starting...");
+                commands.insert_resource(State::new(LudoGameState::InGame));
             }
         }
     }
@@ -186,5 +185,10 @@ impl LudoOnlineClientPool {
 
     pub fn is_handshaked(&self, client: &ClientId) -> bool {
         self.get_information::<bool>(client, "client.handshaked").is_some()
+    }
+
+    pub fn send_packet<T>(&self, client: ClientId, packet: T, mut server: &mut ResMut<RenetServer>) where T: LudoPacket + Serialize + DeserializeOwned {
+        let packet = packet.into_string::<T>().expect("unable to parse packet into string");
+        server.send_message(client, DefaultChannel::ReliableOrdered, packet);
     }
 }
